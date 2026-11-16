@@ -77,6 +77,12 @@ router.patch('/:id', asyncRoute(async (req,res) => {
   const id = parseId(req.params.id,'question id');
   const [[existing]] = await pool.execute('SELECT q.*,s.name AS subject FROM questions q JOIN subjects s ON s.id=q.subject_id WHERE q.id=?',[id]);
   if (!existing) throw httpError(404,'Question not found');
+  const [[usage]] = await pool.execute(
+    `SELECT COUNT(*) AS total FROM exam_questions eq JOIN exams e ON e.id=eq.exam_id
+     WHERE eq.question_id=? AND (e.status IN ('published','closed') OR EXISTS(SELECT 1 FROM exam_attempts a WHERE a.exam_id=e.id))`,
+    [id]
+  );
+  if (usage.total) throw httpError(409,'This question is part of a published/closed exam or an exam attempt and is locked to preserve exam integrity');
   const currentOptions = typeof existing.options === 'string' ? JSON.parse(existing.options) : existing.options;
   const item = normalizeQuestion({
     subject:req.body.subject ?? existing.subject,
