@@ -110,7 +110,7 @@ router.get('/attempts/:id', asyncRoute(async (req, res) => {
 
   const [rows] = await pool.execute(
     `SELECT aq.question_id AS id,aq.question_order AS questionOrder,q.question_text AS question,
-      q.options,aq.option_order,aa.selected_option_key AS selectedOption
+      q.options,aq.option_order,aq.time_spent_seconds AS timeSpentSeconds,aa.selected_option_key AS selectedOption
      FROM attempt_questions aq JOIN questions q ON q.id=aq.question_id
      LEFT JOIN attempt_answers aa ON aa.attempt_id=aq.attempt_id AND aa.question_id=aq.question_id
      WHERE aq.attempt_id=? ORDER BY aq.question_order`,
@@ -121,20 +121,26 @@ router.get('/attempts/:id', asyncRoute(async (req, res) => {
     const order = typeof row.option_order === 'string' ? JSON.parse(row.option_order) : row.option_order;
     const options = {};
     ['A','B','C','D'].forEach((label,index) => { options[label] = source[order[index]]; });
-    return { id:row.id,questionOrder:row.questionOrder,question:row.question,options,selectedOption:row.selectedOption };
+    return { id:row.id,questionOrder:row.questionOrder,question:row.question,options,selectedOption:row.selectedOption,timeSpentSeconds:row.timeSpentSeconds };
   });
   const result = { ...attempt,questions };
   if (attempt.status !== 'in_progress') {
     const [review] = await pool.execute(
-      `SELECT q.id,q.question_text AS question,q.correct_option_key AS correctOption,
-        aa.selected_option_key AS selectedOption,aqr.is_correct AS isCorrect,aqr.marks_awarded AS marksAwarded
+      `SELECT q.id,q.question_text AS question,q.correct_option_key AS correctOption,aq.option_order,
+        aq.time_spent_seconds AS timeSpentSeconds,aa.selected_option_key AS selectedOption,
+        aqr.is_correct AS isCorrect,aqr.marks_awarded AS marksAwarded
        FROM attempt_questions aq JOIN questions q ON q.id=aq.question_id
        LEFT JOIN attempt_answers aa ON aa.attempt_id=aq.attempt_id AND aa.question_id=aq.question_id
        LEFT JOIN attempt_question_results aqr ON aqr.attempt_id=aq.attempt_id AND aqr.question_id=aq.question_id
        WHERE aq.attempt_id=? ORDER BY aq.question_order`,
       [attemptId]
     );
-    result.review = review;
+    result.review = review.map(row => {
+      const order = typeof row.option_order === 'string' ? JSON.parse(row.option_order) : row.option_order;
+      const correctDisplay = ['A','B','C','D'][order.indexOf(row.correctOption)];
+      return { id:row.id,question:row.question,correctOption:correctDisplay,selectedOption:row.selectedOption,
+        isCorrect:row.isCorrect,marksAwarded:row.marksAwarded,timeSpentSeconds:row.timeSpentSeconds };
+    });
   }
   res.json(result);
 }));
@@ -143,7 +149,9 @@ router.put('/attempts/:id/answers/:questionId', asyncRoute(async (req, res) => {
   const attemptId = parseId(req.params.id,'attempt id');
   const questionId = parseId(req.params.questionId,'question id');
   const selected = req.body.selectedOption === null ? null : String(req.body.selectedOption || '').toUpperCase();
+  const timeSpentSeconds = Number(req.body.timeSpentSeconds || 0);
   if (selected !== null && !['A','B','C','D'].includes(selected)) throw httpError(400,'selectedOption must be A, B, C, D or null');
+  if (!Number.isFinite(timeSpentSeconds) || timeSpentSeconds < 0 || timeSpentSeconds > 300) throw httpError(400,'timeSpentSeconds must be between 0 and 300');
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -168,6 +176,10 @@ router.put('/attempts/:id/answers/:questionId', asyncRoute(async (req, res) => {
        ON DUPLICATE KEY UPDATE selected_option_key=VALUES(selected_option_key),saved_at=UTC_TIMESTAMP()`,
       [attemptId,questionId,selected]
     );
+    if (timeSpentSeconds > 0) {
+      await connection.execute('UPDATE attempt_questions SET time_spent_seconds=LEAST(time_spent_seconds+?,36000) WHERE attempt_id=? AND question_id=?',
+        [Math.round(timeSpentSeconds),attemptId,questionId]);
+    }
     await connection.commit();
     res.json({ saved:true,questionId,savedAt:new Date().toISOString() });
   } catch(error) { await connection.rollback().catch(()=>{}); throw error; }
