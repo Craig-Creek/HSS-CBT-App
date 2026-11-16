@@ -12,6 +12,7 @@ router.get('/exams', asyncRoute(async (req, res) => {
   const [rows] = await pool.execute(
     `SELECT e.id,e.title,s.name AS subject,e.instructions,e.duration_minutes AS durationMinutes,
       e.question_count AS questionCount,e.total_marks AS totalMarks,e.pass_mark AS passMark,
+      e.exam_type AS examType,e.exam_mode AS examMode,
       e.starts_at AS startsAt,e.ends_at AS endsAt,
       (SELECT COUNT(*) FROM exam_attempts a WHERE a.exam_id=e.id AND a.student_id=?) AS attemptsUsed,
       e.attempts_allowed AS attemptsAllowed
@@ -49,7 +50,7 @@ router.post('/exams/:examId/start', asyncRoute(async (req, res) => {
     );
     if (existing) {
       await connection.commit();
-      return res.json({ attemptId:existing.id,resumed:true,expiresAt:existing.expires_at });
+      return res.json({ attemptId:existing.id,resumed:true,expiresAt:existing.expires_at,examMode:exam.exam_mode });
     }
 
     const [[used]] = await connection.execute(
@@ -63,8 +64,10 @@ router.post('/exams/:examId/start', asyncRoute(async (req, res) => {
     const chosen = shuffle(poolRows).slice(0,Number(exam.question_count));
     const started = new Date();
     const durationExpiry = new Date(started.getTime() + Number(exam.duration_minutes) * 60000);
-    const examExpiry = exam.ends_at ? new Date(exam.ends_at) : durationExpiry;
-    const expiresAt = durationExpiry < examExpiry ? durationExpiry : examExpiry;
+    const examExpiry = exam.ends_at ? new Date(exam.ends_at) : null;
+    const expiresAt = exam.exam_mode === 'practice'
+      ? (examExpiry || new Date('2099-12-31T23:59:59.000Z'))
+      : (examExpiry && examExpiry < durationExpiry ? examExpiry : durationExpiry);
 
     const [insert] = await connection.execute(
       "INSERT INTO exam_attempts (exam_id,student_id,status,started_at,expires_at) VALUES (?,?,'in_progress',UTC_TIMESTAMP(),?)",
@@ -79,7 +82,7 @@ router.post('/exams/:examId/start', asyncRoute(async (req, res) => {
       );
     }
     await connection.commit();
-    res.status(201).json({ attemptId,resumed:false,expiresAt });
+    res.status(201).json({ attemptId,resumed:false,expiresAt,examMode:exam.exam_mode });
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -90,7 +93,7 @@ router.get('/attempts/:id', asyncRoute(async (req, res) => {
   const attemptId = parseId(req.params.id,'attempt id');
   const studentId = Number(req.user.sub);
   const [[attempt]] = await pool.execute(
-    'SELECT id,exam_id AS examId,status,started_at AS startedAt,expires_at AS expiresAt,submitted_at AS submittedAt,score,percentage FROM exam_attempts WHERE id=? AND student_id=?',
+    'SELECT a.id,a.exam_id AS examId,a.status,a.started_at AS startedAt,a.expires_at AS expiresAt,a.submitted_at AS submittedAt,a.score,a.percentage,e.exam_mode AS examMode FROM exam_attempts a JOIN exams e ON e.id=a.exam_id WHERE a.id=? AND a.student_id=?',
     [attemptId,studentId]
   );
   if (!attempt) throw httpError(404,'Attempt not found');

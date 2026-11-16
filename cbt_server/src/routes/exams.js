@@ -10,6 +10,10 @@ function validateExam(body) {
   const duration=Number(body.durationMinutes), questionCount=Number(body.questionCount);
   const totalMarks=Number(body.totalMarks), passMark=Number(body.passMark??0);
   const attemptsAllowed=Number(body.attemptsAllowed??1);
+  const examType=String(body.examType||'school').toLowerCase();
+  const examMode=String(body.examMode||'timed').toLowerCase();
+  if(!['jamb','waec','neco','school','custom'].includes(examType)) throw httpError(400,'Exam type must be JAMB, WAEC, NECO, school or custom');
+  if(!['timed','practice'].includes(examMode)) throw httpError(400,'Exam mode must be timed or practice');
   if(!title||title.length>180) throw httpError(400,'Exam title is required (maximum 180 characters)');
   if(!Number.isInteger(duration)||duration<1||duration>600) throw httpError(400,'Duration must be between 1 and 600 minutes');
   if(!Number.isInteger(questionCount)||questionCount<1||questionCount>500) throw httpError(400,'Question count must be between 1 and 500');
@@ -19,7 +23,7 @@ function validateExam(body) {
   if(startsAt&&Number.isNaN(new Date(startsAt).getTime())) throw httpError(400,'Invalid exam start date');
   if(endsAt&&Number.isNaN(new Date(endsAt).getTime())) throw httpError(400,'Invalid exam end date');
   if(startsAt&&endsAt&&new Date(endsAt)<=new Date(startsAt)) throw httpError(400,'Exam end time must be after start time');
-  return {title,subjectId,duration,questionCount,totalMarks,passMark,attemptsAllowed,startsAt,endsAt,instructions:body.instructions||null};
+  return {title,subjectId,duration,questionCount,totalMarks,passMark,attemptsAllowed,examType,examMode,startsAt,endsAt,instructions:body.instructions||null};
 }
 
 router.get('/',asyncRoute(async(req,res)=>{
@@ -28,7 +32,7 @@ router.get('/',asyncRoute(async(req,res)=>{
   const [rows]=await pool.execute(
     `SELECT e.id,e.title,e.subject_id AS subjectId,s.name AS subject,e.instructions,
       e.duration_minutes AS durationMinutes,e.question_count AS questionCount,e.total_marks AS totalMarks,
-      e.pass_mark AS passMark,e.attempts_allowed AS attemptsAllowed,e.status,e.starts_at AS startsAt,e.ends_at AS endsAt,
+      e.pass_mark AS passMark,e.attempts_allowed AS attemptsAllowed,e.exam_type AS examType,e.exam_mode AS examMode,e.status,e.starts_at AS startsAt,e.ends_at AS endsAt,
       e.created_at AS createdAt,(SELECT COUNT(*) FROM exam_questions eq WHERE eq.exam_id=e.id) AS questionPoolCount,
       (SELECT COUNT(*) FROM exam_assignments ea WHERE ea.exam_id=e.id) AS assignedGroupCount
      FROM exams e JOIN subjects s ON s.id=e.subject_id
@@ -43,9 +47,9 @@ router.post('/',asyncRoute(async(req,res)=>{
   const [subject]=await pool.execute('SELECT id FROM subjects WHERE id=?',[x.subjectId]);
   if(!subject.length) throw httpError(400,'Subject does not exist');
   const [result]=await pool.execute(
-    `INSERT INTO exams(title,subject_id,instructions,duration_minutes,question_count,total_marks,pass_mark,attempts_allowed,starts_at,ends_at,created_by)
-     VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
-    [x.title,x.subjectId,x.instructions,x.duration,x.questionCount,x.totalMarks,x.passMark,x.attemptsAllowed,x.startsAt,x.endsAt,Number(req.user.sub)]);
+    `INSERT INTO exams(title,subject_id,instructions,duration_minutes,question_count,total_marks,pass_mark,attempts_allowed,exam_type,exam_mode,starts_at,ends_at,created_by)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [x.title,x.subjectId,x.instructions,x.duration,x.questionCount,x.totalMarks,x.passMark,x.attemptsAllowed,x.examType,x.examMode,x.startsAt,x.endsAt,Number(req.user.sub)]);
   res.status(201).json({id:result.insertId,message:'Exam created as draft'});
 }));
 
@@ -57,8 +61,8 @@ router.patch('/:id',asyncRoute(async(req,res)=>{
   const [subject]=await pool.execute('SELECT id FROM subjects WHERE id=?',[x.subjectId]);
   if(!subject.length) throw httpError(400,'Subject does not exist');
   await pool.execute(
-    `UPDATE exams SET title=?,subject_id=?,instructions=?,duration_minutes=?,question_count=?,total_marks=?,pass_mark=?,attempts_allowed=?,starts_at=?,ends_at=? WHERE id=?`,
-    [x.title,x.subjectId,x.instructions,x.duration,x.questionCount,x.totalMarks,x.passMark,x.attemptsAllowed,x.startsAt,x.endsAt,id]);
+    `UPDATE exams SET title=?,subject_id=?,instructions=?,duration_minutes=?,question_count=?,total_marks=?,pass_mark=?,attempts_allowed=?,exam_type=?,exam_mode=?,starts_at=?,ends_at=? WHERE id=?`,
+    [x.title,x.subjectId,x.instructions,x.duration,x.questionCount,x.totalMarks,x.passMark,x.attemptsAllowed,x.examType,x.examMode,x.startsAt,x.endsAt,id]);
   res.json({message:'Draft exam updated'});
 }));
 

@@ -51,6 +51,7 @@ All routes except health and login require a Bearer token. Admin routes require 
 - Correct answers are returned only to administrators.
 
 ### Exams
+- Exam type supports JAMB, WAEC, NECO, school and custom; exam mode supports timed and practice (untimed, subject to any configured exam closing date).
 - `GET/POST /api/exams`; `PATCH/DELETE /api/exams/:id`
 - `PUT /api/exams/:id/questions`; `GET /api/exams/:id/questions`
 - `PUT /api/exams/:id/assignments`; `GET /api/exams/:id/assignments`

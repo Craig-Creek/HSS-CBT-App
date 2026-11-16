@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS questions (
 CREATE TABLE IF NOT EXISTS exams (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(180) NOT NULL,
  subject_id BIGINT UNSIGNED NOT NULL, instructions TEXT NULL,
+ exam_type ENUM('jamb','waec','neco','school','custom') NOT NULL DEFAULT 'school',
+ exam_mode ENUM('timed','practice') NOT NULL DEFAULT 'timed',
  duration_minutes SMALLINT UNSIGNED NOT NULL, question_count SMALLINT UNSIGNED NOT NULL,
  total_marks DECIMAL(8,2) NOT NULL, pass_mark DECIMAL(8,2) NOT NULL DEFAULT 0,
  attempts_allowed TINYINT UNSIGNED NOT NULL DEFAULT 1,
