@@ -7,19 +7,17 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME || 'hss_cbt',
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 15,
   queueLimit: 0,
   charset: 'utf8mb4',
+  timezone: 'Z',
   decimalNumbers: true
 });
 
 async function checkDatabase() {
   const connection = await pool.getConnection();
-  try {
-    await connection.ping();
-  } finally {
-    connection.release();
-  }
+  try { await connection.ping(); }
+  finally { connection.release(); }
 }
 
 module.exports = { pool, checkDatabase };
