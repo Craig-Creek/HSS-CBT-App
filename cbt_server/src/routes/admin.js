@@ -110,11 +110,18 @@ router.post('/groups', asyncRoute(async (req, res) => {
 
 router.patch('/groups/:id', asyncRoute(async (req, res) => {
   const id = parseId(req.params.id);
-  const name = req.body.name === undefined ? undefined : String(req.body.name).trim();
-  if (name !== undefined && (!name || name.length > 100)) throw httpError(400, 'Invalid group name');
-  const description = req.body.description;
-  const [result] = await pool.execute('UPDATE student_groups SET name=COALESCE(?,name), description=? WHERE id=?',
-    [name || null, description === undefined ? null : (description || null), id]);
+  const fields = [], values = [];
+  if (req.body.name !== undefined) {
+    const name = String(req.body.name).trim();
+    if (!name || name.length > 100) throw httpError(400, 'Invalid group name');
+    fields.push('name=?'); values.push(name);
+  }
+  if (req.body.description !== undefined) {
+    fields.push('description=?'); values.push(req.body.description || null);
+  }
+  if (!fields.length) throw httpError(400, 'No group fields supplied');
+  values.push(id);
+  const [result] = await pool.execute(`UPDATE student_groups SET ${fields.join(',')} WHERE id=?`, values);
   if (!result.affectedRows) throw httpError(404, 'Group not found');
   res.json({ message: 'Group updated' });
 }));
