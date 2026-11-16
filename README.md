@@ -17,7 +17,7 @@ Central Node.js/Express API and MySQL database for the school's LAN-based Comput
 3. Run `npm install`.
 4. Copy `.env.example` to `.env` and configure the database and a long random JWT secret.
 5. For a new database, run `database/schema.sql` in MySQL.
-6. For a database created with the earlier starter schema, run `database/migrations/002_exam_lifecycle.sql` once, then `database/migrations/003_question_timing.sql` once.
+6. For a database created with the earlier starter schema, run `database/migrations/002_exam_lifecycle.sql`, then `database/migrations/003_question_timing.sql`, then `database/migrations/004_exam_modes.sql` once each, in that order.
 7. Run `npm run create-admin` and follow the prompts to create the first administrator.
 8. Run `npm run dev` or `npm start`.
 9. Check `http://localhost:3000/api/health`.
