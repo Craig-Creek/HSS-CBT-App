@@ -172,7 +172,8 @@ router.get('/:id/analytics',asyncRoute(async(req,res)=>{
      FROM exam_attempts WHERE exam_id=?`,[id]);
   const [topics]=await pool.execute(
     `SELECT COALESCE(q.topic,'Uncategorised') AS topic,COUNT(*) AS responses,
-      SUM(aqr.is_correct=1) AS correct,AVG(aqr.is_correct)*100 AS accuracy
+      SUM(aqr.is_correct=1) AS correct,AVG(aqr.is_correct)*100 AS accuracy,
+      AVG(aq.time_spent_seconds) AS averageTimeSpentSeconds
      FROM attempt_questions aq JOIN questions q ON q.id=aq.question_id
      JOIN attempt_question_results aqr ON aqr.attempt_id=aq.attempt_id AND aqr.question_id=aq.question_id
      JOIN exam_attempts a ON a.id=aq.attempt_id WHERE a.exam_id=? GROUP BY q.topic ORDER BY q.topic`,[id]);
