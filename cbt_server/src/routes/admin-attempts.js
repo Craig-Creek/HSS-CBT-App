@@ -16,7 +16,7 @@ router.get('/:id',asyncRoute(async(req,res)=>{
   const [answers]=await pool.execute(
     `SELECT q.id,q.question_text AS question,aa.selected_option_key AS selectedOption,
       q.correct_option_key AS correctOption,aqr.is_correct AS isCorrect,aqr.marks_awarded AS marksAwarded,
-      q.options,aq.option_order,aq.question_order AS questionOrder
+      q.options,aq.option_order,aq.time_spent_seconds AS timeSpentSeconds,aq.question_order AS questionOrder
      FROM attempt_questions aq JOIN questions q ON q.id=aq.question_id
      LEFT JOIN attempt_answers aa ON aa.attempt_id=aq.attempt_id AND aa.question_id=aq.question_id
      LEFT JOIN attempt_question_results aqr ON aqr.attempt_id=aq.attempt_id AND aqr.question_id=aq.question_id
@@ -29,7 +29,7 @@ router.get('/:id',asyncRoute(async(req,res)=>{
     const correctDisplay=['A','B','C','D'][order.indexOf(row.correctOption)];
     return {id:row.id,question:row.question,questionOrder:row.questionOrder,options:displayed,
       selectedOption:row.selectedOption,correctOption:attempt.status==='in_progress'?undefined:correctDisplay,
-      isCorrect:attempt.status==='in_progress'?undefined:row.isCorrect,marksAwarded:row.marksAwarded};
+      isCorrect:attempt.status==='in_progress'?undefined:row.isCorrect,marksAwarded:row.marksAwarded,timeSpentSeconds:row.timeSpentSeconds};
   });
   res.json({attempt,questions:review});
 }));
