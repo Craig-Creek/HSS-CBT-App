@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
 CREATE TABLE IF NOT EXISTS attempt_questions (
  attempt_id BIGINT UNSIGNED NOT NULL, question_id BIGINT UNSIGNED NOT NULL,
  question_order SMALLINT UNSIGNED NOT NULL, option_order JSON NOT NULL,
+ time_spent_seconds INT UNSIGNED NOT NULL DEFAULT 0,
  PRIMARY KEY(attempt_id,question_id), UNIQUE KEY uq_attempt_question_order(attempt_id,question_order),
  CONSTRAINT fk_attempt_questions_attempt FOREIGN KEY(attempt_id) REFERENCES exam_attempts(id),
  CONSTRAINT fk_attempt_questions_question FOREIGN KEY(question_id) REFERENCES questions(id)
